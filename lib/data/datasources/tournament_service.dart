@@ -78,16 +78,21 @@ class TournamentService {
     
     final batch = _db.batch();
 
-    // 1. Remove all old registrations for this tournament so participant list is 100% clean for the new match
+    // 1. Mark all old registrations as completed history (DO NOT DELETE so users retain history in My Matches -> Completed)
     final regs = await _db.collection('registrations').where('tournamentId', isEqualTo: id).get();
     for (var doc in regs.docs) {
-      batch.delete(doc.reference);
+      batch.update(doc.reference, {
+        'isCompletedHistory': true,
+        'status': 'completed',
+      });
     }
 
-    // 2. Clear all old result records for this tournament so new match results start fresh
+    // 2. Mark old result records as completed history (DO NOT DELETE so past results are preserved for history)
     final oldResults = await _db.collection('results').where('tournamentId', isEqualTo: id).get();
     for (var doc in oldResults.docs) {
-      batch.delete(doc.reference);
+      batch.update(doc.reference, {
+        'isCompletedHistory': true,
+      });
     }
 
     await batch.commit();
@@ -656,7 +661,9 @@ class TournamentService {
 
     final existing = await resultsCollection.where('tournamentId', isEqualTo: tournamentId).get();
     for (var doc in existing.docs) {
-      batch.delete(doc.reference);
+      if (doc.data()['isCompletedHistory'] != true) {
+        batch.delete(doc.reference);
+      }
     }
 
     for (var result in results) {
@@ -688,25 +695,29 @@ class TournamentService {
 
       if (prizeWon > 0) {
         // 1. Credit User Wallet Balance & Total Earnings
-        await _db.collection('users').doc(userId).update({
-          'balance': FieldValue.increment(prizeWon),
-          'totalEarnings': FieldValue.increment(prizeWon),
-          if (rank == 1) 'totalWins': FieldValue.increment(1),
-        }).catchError((e) {
+        try {
+          await _db.collection('users').doc(userId).update({
+            'balance': FieldValue.increment(prizeWon),
+            'totalEarnings': FieldValue.increment(prizeWon),
+            if (rank == 1) 'totalWins': FieldValue.increment(1),
+          });
+        } catch (e) {
           debugPrint("Error updating balance for user $userId: $e");
-        });
+        }
 
         // 2. Add Transaction Log to History
-        await _db.collection('transactions').add({
-          'userId': userId,
-          'amount': prizeWon,
-          'type': 'prize',
-          'dateTime': Timestamp.now(),
-          'status': 'success',
-          'description': 'Tournament Prize (Rank #${rank > 0 ? rank : '-'}, $kills Kills) - $tournamentTitle',
-        }).catchError((e) {
+        try {
+          await _db.collection('transactions').add({
+            'userId': userId,
+            'amount': prizeWon,
+            'type': 'prize',
+            'dateTime': Timestamp.now(),
+            'status': 'success',
+            'description': 'Tournament Prize (Rank #${rank > 0 ? rank : '-'}, $kills Kills) - $tournamentTitle',
+          });
+        } catch (e) {
           debugPrint("Error adding transaction for user $userId: $e");
-        });
+        }
 
         // 3. Mark Registration Prize Paid
         try {

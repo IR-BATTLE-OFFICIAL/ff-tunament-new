@@ -82,7 +82,17 @@ class MyMatchesScreen extends StatelessWidget {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               margin: const EdgeInsets.only(bottom: 15),
               child: InkWell(
-                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => TournamentDetailsScreen(tournament: t))),
+                onTap: () {
+                  final tournamentToPass = (isCompleted || r.isCompletedHistory)
+                      ? t.copyWith(status: 'completed')
+                      : t;
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => TournamentDetailsScreen(tournament: tournamentToPass),
+                    ),
+                  );
+                },
                 borderRadius: BorderRadius.circular(12),
                 child: Column(
                   children: [
