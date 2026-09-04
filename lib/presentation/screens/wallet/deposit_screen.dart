@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:ff_arena/core/theme/app_theme.dart';
 import 'package:ff_arena/presentation/providers/auth_provider.dart';
 import 'package:ff_arena/presentation/providers/tournament_provider.dart';
@@ -78,65 +77,6 @@ class _DepositScreenState extends State<DepositScreen> {
     }
   }
 
-  void _downloadOrViewQr(String qrUrl) {
-    showDialog(
-      context: context,
-      builder: (ctx) => Dialog(
-        backgroundColor: const Color(0xFF10141A),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text("MERCHANT QR SCANNER", style: TextStyle(fontWeight: FontWeight.w900, color: AppColors.primary, fontSize: 14)),
-                  IconButton(icon: const Icon(Icons.close, color: Colors.grey), onPressed: () => Navigator.pop(ctx)),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(color: AppColors.primary.withValues(alpha: 0.3), blurRadius: 15),
-                  ],
-                ),
-                child: qrUrl.startsWith('http')
-                    ? Image.network(qrUrl, height: 220, width: 220, fit: BoxFit.contain)
-                    : Image.asset('assets/images/payment_qr.jpeg', height: 220, width: 220),
-              ),
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.pop(ctx);
-                    Clipboard.setData(ClipboardData(text: qrUrl));
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text("📷 Take screenshot or long press to save QR image to gallery!"),
-                        backgroundColor: Colors.green,
-                        duration: Duration(seconds: 4),
-                      ),
-                    );
-                  },
-                  icon: const Icon(Icons.download, color: Colors.black),
-                  label: const Text("SAVE QR TO GALLERY", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   void _submitScreenshotRequest() async {
     final amount = double.tryParse(_amountController.text) ?? 0;
 
@@ -150,7 +90,7 @@ class _DepositScreenState extends State<DepositScreen> {
     if (_screenshot == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text("Please upload your payment screenshot."),
+          content: Text("Please upload your payment screenshot first."),
           backgroundColor: Colors.redAccent,
         ),
       );
@@ -178,7 +118,7 @@ class _DepositScreenState extends State<DepositScreen> {
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text("✅ Request submitted! Wallet will auto-update as soon as payment is confirmed."),
+              content: Text("✅ Payment screenshot submitted! Wallet will auto-update upon admin confirmation."),
               backgroundColor: Colors.green,
             ),
           );
@@ -273,14 +213,14 @@ class _DepositScreenState extends State<DepositScreen> {
             padding: const EdgeInsets.all(16),
             child: _step == 1
                 ? _buildStep1AmountInput(user?.uid ?? '')
-                : _buildStep2QrAndScreenshot(qrCodeUrl),
+                : _buildStep2QrAndUpload(qrCodeUrl),
           );
         },
       ),
     );
   }
 
-  // ─── STEP 1: AMOUNT INPUT ───
+  // ─── STEP 1: ENTER AMOUNT ───
   Widget _buildStep1AmountInput(String userId) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -364,7 +304,7 @@ class _DepositScreenState extends State<DepositScreen> {
 
         const SizedBox(height: 20),
 
-        // Voucher Input Box
+        // Bonus Voucher Box
         Row(
           children: [
             Expanded(
@@ -401,7 +341,7 @@ class _DepositScreenState extends State<DepositScreen> {
           Text("⚡ Voucher Applied: ${_appliedVoucher!['value']}% Bonus will be added!", style: const TextStyle(color: AppColors.neonGreen, fontSize: 12, fontWeight: FontWeight.bold)),
         ],
 
-        const SizedBox(height: 40),
+        const SizedBox(height: 36),
 
         // NEXT BUTTON
         SizedBox(
@@ -440,14 +380,14 @@ class _DepositScreenState extends State<DepositScreen> {
     );
   }
 
-  // ─── STEP 2: SCAN QR CODE & UPLOAD SCREENSHOT ───
-  Widget _buildStep2QrAndScreenshot(String qrCodeUrl) {
+  // ─── STEP 2: SCANNER & DIRECT UPLOAD SCREENSHOT ───
+  Widget _buildStep2QrAndUpload(String qrCodeUrl) {
     final amount = double.tryParse(_amountController.text) ?? 0;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Selected Amount Header Bar
+        // Selected Amount Bar
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(
@@ -460,7 +400,7 @@ class _DepositScreenState extends State<DepositScreen> {
             children: [
               Row(
                 children: [
-                  const Text("DEPOSIT AMOUNT: ", style: TextStyle(color: AppColors.textMuted, fontSize: 12, fontWeight: FontWeight.bold)),
+                  const Text("AMOUNT TO PAY: ", style: TextStyle(color: AppColors.textMuted, fontSize: 12, fontWeight: FontWeight.bold)),
                   Text("₹${amount.toStringAsFixed(0)}", style: const TextStyle(color: AppColors.primary, fontSize: 18, fontWeight: FontWeight.w900)),
                 ],
               ),
@@ -480,10 +420,10 @@ class _DepositScreenState extends State<DepositScreen> {
 
         const SizedBox(height: 16),
 
-        // ─── TOP CARD: SCAN QR CODE TO PAY ───
+        // ─── MAIN SCANNER & SCREENSHOT CARD ───
         Container(
           width: double.infinity,
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
             color: const Color(0xFF10141A),
             borderRadius: BorderRadius.circular(20),
@@ -505,9 +445,9 @@ class _DepositScreenState extends State<DepositScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 16),
 
-              // QR Code Box with Gold/Glowing Border
+              // QR Code Image
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
@@ -520,173 +460,97 @@ class _DepositScreenState extends State<DepositScreen> {
                 child: qrCodeUrl.isNotEmpty
                     ? Image.network(
                         qrCodeUrl,
-                        height: 210,
-                        width: 210,
+                        height: 220,
+                        width: 220,
                         fit: BoxFit.contain,
-                        errorBuilder: (context, error, stackTrace) => Image.asset('assets/images/payment_qr.jpeg', height: 210, width: 210),
+                        errorBuilder: (context, error, stackTrace) => Image.asset('assets/images/payment_qr.jpeg', height: 220, width: 220),
                       )
-                    : Image.asset('assets/images/payment_qr.jpeg', height: 210, width: 210),
+                    : Image.asset('assets/images/payment_qr.jpeg', height: 220, width: 220),
               ),
 
-              const SizedBox(height: 14),
+              const SizedBox(height: 20),
 
-              // DOWNLOAD / SAVE QR SCANNER BUTTON
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () => _downloadOrViewQr(
-                    qrCodeUrl.isNotEmpty ? qrCodeUrl : "assets/images/payment_qr.jpeg",
-                  ),
-                  icon: const Icon(Icons.download, color: AppColors.primary, size: 18),
-                  label: const Text("DOWNLOAD / SAVE QR SCANNER", style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 12)),
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: AppColors.primary, width: 1.5),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
+              // ─── BUTTON UNDER SCANNER: UPLOAD PAYMENT SCREENSHOT ───
+              if (_screenshot == null) ...[
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton.icon(
+                    onPressed: _pickScreenshot,
+                    icon: const Icon(Icons.add_a_photo, color: Colors.black, size: 20),
+                    label: const Text(
+                      "UPLOAD PAYMENT SCREENSHOT",
+                      style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 0.5),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      elevation: 4,
+                    ),
                   ),
                 ),
-              ),
-            ],
-          ),
-        ),
-
-        const SizedBox(height: 16),
-
-        // ─── BOTTOM CARD: UPLOAD PAYMENT SCREENSHOT ───
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: const Color(0xFF10141A),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: _screenshot != null
-                  ? AppColors.neonGreen
-                  : AppColors.primary.withValues(alpha: 0.4),
-              width: 1.5,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: (_screenshot != null ? AppColors.neonGreen : AppColors.primary).withValues(alpha: 0.15),
-                blurRadius: 12,
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.2),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.add_a_photo, color: AppColors.primary, size: 18),
-                  ),
-                  const SizedBox(width: 10),
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          "UPLOAD PAYMENT SCREENSHOT",
-                          style: TextStyle(
-                            color: AppColors.primary,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                        SizedBox(height: 2),
-                        Text(
-                          "Pay via QR above & upload screenshot here to credit wallet",
-                          style: TextStyle(color: AppColors.textMuted, fontSize: 10),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-
-              // Image Picker Box
-              InkWell(
-                onTap: _pickScreenshot,
-                borderRadius: BorderRadius.circular(14),
-                child: Container(
-                  width: double.infinity,
-                  height: 125,
+              ] else ...[
+                // SCREENSHOT PREVIEW & CONFIRM BUTTON
+                Container(
+                  padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: const Color(0xFF161B22),
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
-                      color: _screenshot != null
-                          ? AppColors.neonGreen
-                          : Colors.white24,
-                      width: _screenshot != null ? 2 : 1,
+                    border: Border.all(color: AppColors.neonGreen, width: 1.5),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.file(_screenshot!, width: 60, height: 60, fit: BoxFit.cover),
+                          ),
+                          const SizedBox(width: 12),
+                          const Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text("Screenshot Selected ✅", style: TextStyle(color: AppColors.neonGreen, fontWeight: FontWeight.bold, fontSize: 12)),
+                                SizedBox(height: 2),
+                                Text("Tap confirm below to complete deposit", style: TextStyle(color: AppColors.textMuted, fontSize: 10)),
+                              ],
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: _pickScreenshot,
+                            child: const Text("Change", style: TextStyle(color: AppColors.primary, fontSize: 11, fontWeight: FontWeight.bold)),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 14),
+
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton.icon(
+                    onPressed: _isLoading ? null : _submitScreenshotRequest,
+                    icon: _isLoading
+                        ? const SizedBox.shrink()
+                        : const Icon(Icons.check_circle_rounded, color: Colors.black, size: 20),
+                    label: _isLoading
+                        ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
+                        : const Text(
+                            "CONFIRM PAYMENT SCREENSHOT",
+                            style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 0.5),
+                          ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.neonGreen,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      elevation: 6,
                     ),
                   ),
-                  child: _screenshot != null
-                      ? ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: Image.file(_screenshot!, fit: BoxFit.cover),
-                        )
-                      : Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                color: AppColors.primary.withValues(alpha: 0.1),
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(Icons.cloud_upload_outlined, size: 26, color: AppColors.primary),
-                            ),
-                            const SizedBox(height: 8),
-                            const Text(
-                              "Tap to Choose Screenshot from Gallery",
-                              style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-                            ),
-                            const SizedBox(height: 2),
-                            const Text(
-                              "JPEG, PNG screenshots accepted",
-                              style: TextStyle(color: AppColors.textMuted, fontSize: 10),
-                            ),
-                          ],
-                        ),
                 ),
-              ),
-
-              const SizedBox(height: 14),
-
-              // Submit screenshot for verification
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
-                  onPressed: _isLoading ? null : _submitScreenshotRequest,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                    elevation: 4,
-                  ),
-                  child: _isLoading
-                      ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
-                      : const Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.send_rounded, color: Colors.black, size: 18),
-                            SizedBox(width: 8),
-                            Text(
-                              "SUBMIT PAYMENT SCREENSHOT",
-                              style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 0.5),
-                            ),
-                          ],
-                        ),
-                ),
-              ),
+              ],
             ],
           ),
         ),
