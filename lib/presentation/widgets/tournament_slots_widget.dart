@@ -53,9 +53,9 @@ class _TournamentSlotsWidgetState extends State<TournamentSlotsWidget> {
           physics: const NeverScrollableScrollPhysics(),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: widget.totalSlots > 24 ? 6 : 5,
-            childAspectRatio: 1.2,
-            crossAxisSpacing: 6,
-            mainAxisSpacing: 6,
+            childAspectRatio: 1.8,
+            crossAxisSpacing: 4,
+            mainAxisSpacing: 4,
           ),
           itemCount: slots.length,
           itemBuilder: (context, index) {
@@ -73,14 +73,14 @@ class _TournamentSlotsWidgetState extends State<TournamentSlotsWidget> {
                       widget.onSlotSelected(_selectedSlot);
                     },
               child: Container(
-                margin: const EdgeInsets.all(2),
+                margin: const EdgeInsets.all(1),
                 decoration: BoxDecoration(
                   color: isLocked
                       ? Colors.red.withValues(alpha: 0.2)
                       : (isSelected
                           ? AppColors.primary.withValues(alpha: 0.4)
                           : Colors.green.withValues(alpha: 0.15)),
-                  borderRadius: BorderRadius.circular(6),
+                  borderRadius: BorderRadius.circular(4),
                   border: Border.all(
                     color: isLocked
                         ? Colors.red.shade300

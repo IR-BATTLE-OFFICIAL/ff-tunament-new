@@ -19,7 +19,7 @@ class SmsListenerService {
   factory SmsListenerService() => _instance;
   SmsListenerService._internal();
 
-  static const _channel = MethodChannel('com.irbattle.app/sms');
+  static const _channel = MethodChannel('com.ffarena.ff_arena/sms');
 
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   bool _isListening = false;

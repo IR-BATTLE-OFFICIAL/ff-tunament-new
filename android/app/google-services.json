@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "886946341961",
+    "firebase_url": "https://ff-arena-31e36-default-rtdb.firebaseio.com",
+    "project_id": "ff-arena-31e36",
+    "storage_bucket": "ff-arena-31e36.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:886946341961:android:0ad0e6d7b2f36fd6d3cb98",
+        "android_client_info": {
+          "package_name": "com.ffarena.ff_arena"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "886946341961-e3hk6taloojh0d6i8kupnu23k9esqqe3.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.ffarena.ff_arena",
+            "certificate_hash": "920e9a5d5b1104baf316113d9974722f05879ad8"
+          }
+        },
+        {
+          "client_id": "886946341961-rf9k7oc7f12411h2v71vc00ah3vr6vsf.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAqjsUw05_jZtraApJhitFov1paaFzj6Mg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "886946341961-rf9k7oc7f12411h2v71vc00ah3vr6vsf.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

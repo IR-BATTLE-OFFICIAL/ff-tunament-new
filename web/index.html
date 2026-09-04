@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base href="$FLUTTER_BASE_HREF">
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="IR BATTLE Esports Platform">
+
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="IR BATTLE">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+  <link rel="icon" type="image/png" href="favicon.png"/>
+
+  <title>IR BATTLE Esports</title>
+  <link rel="manifest" href="manifest.json">
+
+  <style>
+    body {
+      background-color: #0D1117;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      color: #FFB800;
+      font-family: Arial, sans-serif;
+      overflow: hidden;
+    }
+    .loading-container {
+      text-align: center;
+    }
+    .spinner {
+      width: 50px;
+      height: 50px;
+      border: 4px solid #161B22;
+      border-top: 4px solid #FFB800;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 15px auto;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .title {
+      font-weight: 900;
+      font-size: 18px;
+      letter-spacing: 2px;
+      color: #FFB800;
+    }
+    .subtitle {
+      font-size: 12px;
+      color: #8B949E;
+      margin-top: 6px;
+    }
+  </style>
+</head>
+<body>
+  <div id="loading" class="loading-container">
+    <div class="spinner"></div>
+    <div class="title">IR BATTLE</div>
+    <div class="subtitle">Loading Esports Engine...</div>
+  </div>
+
+  <script src="flutter_bootstrap.js" async></script>
+</body>
+</html>
