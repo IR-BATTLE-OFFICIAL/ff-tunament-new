@@ -391,6 +391,13 @@ class _UploadResultsScreenState extends State<UploadResultsScreen> {
         result['booyahPrize'] = defaultBooyah;
         _controllerFor(result['userId'], 'booyahPrize').text = defaultBooyah.toStringAsFixed(0);
       }
+    } else {
+      // If rank is not 1, reset booyahPrize to 0 if it was auto-set
+      final currentBooyah = (result['booyahPrize'] as num?)?.toDouble() ?? 0.0;
+      if (currentBooyah == widget.tournament.booyahPool || currentBooyah == widget.tournament.prizePool) {
+        result['booyahPrize'] = 0.0;
+        _controllerFor(result['userId'], 'booyahPrize').text = "0";
+      }
     }
 
     _refreshTotal(result);

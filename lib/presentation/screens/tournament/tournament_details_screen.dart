@@ -29,11 +29,11 @@ class _TournamentDetailsScreenState extends State<TournamentDetailsScreen> {
     final killPrize = (result['killPrize'] as num?)?.toDouble() ?? 0;
     final booyahPrize = (result['booyahPrize'] as num?)?.toDouble() ?? 0;
     
-    if (positionPrize > 0) parts.add('Position ₹${positionPrize.toStringAsFixed(0)}');
-    if (killPrize > 0) parts.add('Kill ₹${killPrize.toStringAsFixed(0)}');
-    if (booyahPrize > 0) parts.add('Booyah ₹${booyahPrize.toStringAsFixed(0)}');
+    if (positionPrize > 0) parts.add('Position ₹${_formatAmount(positionPrize)}');
+    if (killPrize > 0) parts.add('Kill ₹${_formatAmount(killPrize)}');
+    if (booyahPrize > 0) parts.add('Booyah ₹${_formatAmount(booyahPrize)}');
     
-    return parts.isEmpty ? '₹0' : parts.join(' • ');
+    return parts.isEmpty ? '' : parts.join(' • ');
   }
 
   String _formatAmount(double val) {
@@ -1429,8 +1429,10 @@ class _TournamentDetailsScreenState extends State<TournamentDetailsScreen> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
-                      _buildSummaryTile("TOTAL KILLS", "$totalMatchKills", Icons.local_fire_department, AppColors.neonRed),
-                      Container(width: 1, height: 26, color: Colors.white10),
+                      if (totalMatchKills > 0 || widget.tournament.perKillPrize > 0) ...[
+                        _buildSummaryTile("TOTAL KILLS", "$totalMatchKills", Icons.local_fire_department, AppColors.neonRed),
+                        Container(width: 1, height: 26, color: Colors.white10),
+                      ],
                       _buildSummaryTile("PRIZE PAID", "₹${totalPrizeDistributed.toStringAsFixed(0)}", Icons.payments, AppColors.neonGreen),
                       if (mvpPlayer != null && maxKills > 0) ...[
                         Container(width: 1, height: 26, color: Colors.white10),
@@ -1508,22 +1510,23 @@ class _TournamentDetailsScreenState extends State<TournamentDetailsScreen> {
                                 ],
                               ),
                             ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: Colors.black.withValues(alpha: 0.5),
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(color: AppColors.primary.withValues(alpha: 0.4)),
+                            if ((booyahWinner['kills'] as num? ?? 0) > 0 || widget.tournament.perKillPrize > 0)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withValues(alpha: 0.5),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: AppColors.primary.withValues(alpha: 0.4)),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.gps_fixed, size: 12, color: AppColors.primary),
+                                    const SizedBox(width: 4),
+                                    Text("${booyahWinner['kills']} Kills", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                                  ],
+                                ),
                               ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(Icons.gps_fixed, size: 12, color: AppColors.primary),
-                                  const SizedBox(width: 4),
-                                  Text("${booyahWinner['kills']} Kills", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
-                                ],
-                              ),
-                            ),
                           ],
                         ),
                       ],
@@ -1634,7 +1637,7 @@ class _TournamentDetailsScreenState extends State<TournamentDetailsScreen> {
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
-                                  "UID: ${res['ffUid'] ?? 'N/A'}${prizeBreakdownStr.isNotEmpty && prizeBreakdownStr != '₹0' ? ' • $prizeBreakdownStr' : ''}",
+                                  "UID: ${res['ffUid'] ?? 'N/A'}${prizeBreakdownStr.isNotEmpty ? ' • $prizeBreakdownStr' : ''}",
                                   style: const TextStyle(fontSize: 10, color: AppColors.textMuted),
                                 ),
                               ],
@@ -1645,17 +1648,18 @@ class _TournamentDetailsScreenState extends State<TournamentDetailsScreen> {
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                decoration: BoxDecoration(
-                                  color: Colors.white10,
-                                  borderRadius: BorderRadius.circular(6),
+                              if (kills > 0 || widget.tournament.perKillPrize > 0)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white10,
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    "$kills Kills",
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Colors.white),
+                                  ),
                                 ),
-                                child: Text(
-                                  "$kills Kills",
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Colors.white),
-                                ),
-                              ),
                               if (prizeWon > 0) ...[
                                 const SizedBox(height: 4),
                                 Text(

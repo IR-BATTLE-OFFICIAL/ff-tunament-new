@@ -362,10 +362,12 @@ class ManageTournamentsScreen extends StatelessWidget {
                 itemBuilder: (context, index) {
                   final result = results[index];
                   final total = (result['prizeWon'] ?? 0).toDouble();
+                  final kills = (result['kills'] as num?)?.toInt() ?? 0;
+                  final showKills = tournament.perKillPrize > 0 || kills > 0;
                   return ListTile(
                     leading: CircleAvatar(child: Text("#${result['rank'] ?? '-'}")),
                     title: Text(result['playerName'] ?? 'Player'),
-                    subtitle: Text("${result['kills'] ?? 0} kills"),
+                    subtitle: showKills ? Text("$kills kills") : null,
                     trailing: Text("₹${total.toStringAsFixed(0)}", style: const TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold)),
                   );
                 },
