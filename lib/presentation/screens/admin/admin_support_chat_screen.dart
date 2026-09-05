@@ -21,6 +21,7 @@ class AdminSupportChatScreen extends StatefulWidget {
 class _AdminSupportChatScreenState extends State<AdminSupportChatScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  int _previousMsgCount = 0;
 
   void _sendMessage() async {
     final text = _messageController.text.trim();
@@ -74,9 +75,16 @@ class _AdminSupportChatScreenState extends State<AdminSupportChatScreen> {
                 
                 final messages = snapshot.data ?? [];
                 
-                // Mark as read
-                provider.markSupportRead(widget.userId, true);
-                _scrollToBottom();
+                // Safe execution only when message count changes (Prevents Infinite Rebuild Loop!)
+                if (messages.length != _previousMsgCount) {
+                  _previousMsgCount = messages.length;
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (mounted) {
+                      provider.markSupportRead(widget.userId, true);
+                      _scrollToBottom();
+                    }
+                  });
+                }
 
                 return ListView.builder(
                   controller: _scrollController,
