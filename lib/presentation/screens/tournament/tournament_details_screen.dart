@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import 'package:ff_arena/data/models/registration_model.dart';
 import 'package:intl/intl.dart';
 import 'package:ff_arena/presentation/screens/tournament/join_tournament_screen.dart';
+import 'package:ff_arena/presentation/widgets/prize_breakdown_widget.dart';
 
 class TournamentDetailsScreen extends StatefulWidget {
   final TournamentModel tournament;
@@ -23,13 +24,16 @@ class _TournamentDetailsScreenState extends State<TournamentDetailsScreen> {
 
   String _prizeBreakdown(Map<String, dynamic> result) {
     final parts = <String>[];
+    
     final positionPrize = (result['positionPrize'] as num?)?.toDouble() ?? 0;
     final killPrize = (result['killPrize'] as num?)?.toDouble() ?? 0;
     final booyahPrize = (result['booyahPrize'] as num?)?.toDouble() ?? 0;
+    
     if (positionPrize > 0) parts.add('Position ₹${positionPrize.toStringAsFixed(0)}');
     if (killPrize > 0) parts.add('Kill ₹${killPrize.toStringAsFixed(0)}');
     if (booyahPrize > 0) parts.add('Booyah ₹${booyahPrize.toStringAsFixed(0)}');
-    return parts.join(' • ');
+    
+    return parts.isEmpty ? '₹0' : parts.join(' • ');
   }
 
   String _formatAmount(double val) {
@@ -211,6 +215,12 @@ class _TournamentDetailsScreenState extends State<TournamentDetailsScreen> {
                         _buildMatchDetailsGrid(),
 
                         const SizedBox(height: 24),
+
+                        // ─── PRIZE BREAKDOWN SECTION ───
+                        if (widget.tournament.prizeBreakdown.isNotEmpty) ...[
+                          PrizeBreakdownWidget(prizeBreakdown: widget.tournament.prizeBreakdown),
+                          const SizedBox(height: 24),
+                        ],
 
                         // ─── UPCOMING ONLY SECTIONS (Match Rules, Slots Grid, Joined Players) ───
                         if (widget.tournament.status.toLowerCase() == 'upcoming') ...[
@@ -1330,8 +1340,10 @@ class _TournamentDetailsScreenState extends State<TournamentDetailsScreen> {
     );
   }
 
-  // ─── RESULTS SECTION ───
+  // ─── RESULTS SECTION (Pro Survival eSports Scorecard) ───
   Widget _buildResultsSection(TournamentProvider provider) {
+    final currentUserId = Provider.of<AuthProvider>(context, listen: false).userModel?.uid;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1339,16 +1351,37 @@ class _TournamentDetailsScreenState extends State<TournamentDetailsScreen> {
           children: [
             Container(width: 4, height: 16, decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(2))),
             const SizedBox(width: 8),
-            const Text("TOURNAMENT RESULTS", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: 0.8)),
+            const Text("SURVIVAL MATCH SCORECARD & RESULTS", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: 0.8)),
           ],
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 12),
 
         StreamBuilder<List<Map<String, dynamic>>>(
           stream: provider.results(widget.tournament.id),
           builder: (context, resSnapshot) {
-            if (resSnapshot.connectionState == ConnectionState.waiting) return const CircularProgressIndicator(color: AppColors.primary);
-            if (!resSnapshot.hasData || resSnapshot.data!.isEmpty) return const Text("Results not declared yet.", style: TextStyle(color: AppColors.textMuted, fontSize: 12));
+            if (resSnapshot.connectionState == ConnectionState.waiting) {
+              return const Center(padding: EdgeInsets.all(20), child: CircularProgressIndicator(color: AppColors.primary));
+            }
+            if (!resSnapshot.hasData || resSnapshot.data!.isEmpty) {
+              return Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: const Color(0xFF30363D)),
+                ),
+                child: const Column(
+                  children: [
+                    Icon(Icons.emoji_events_outlined, size: 36, color: Colors.grey),
+                    SizedBox(height: 8),
+                    Text("Results not declared yet", style: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold, fontSize: 14)),
+                    SizedBox(height: 4),
+                    Text("Admin will calculate and declare Survival match results here once match ends.", style: TextStyle(color: AppColors.textMuted, fontSize: 11), textAlign: TextAlign.center),
+                  ],
+                ),
+              );
+            }
 
             final results = List<Map<String, dynamic>>.from(resSnapshot.data!);
             results.sort((a, b) {
@@ -1360,58 +1393,304 @@ class _TournamentDetailsScreenState extends State<TournamentDetailsScreen> {
               return rA.compareTo(rB);
             });
 
-            return ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: results.length,
-              separatorBuilder: (context, index) => const SizedBox(height: 8),
-              itemBuilder: (context, index) {
-                final res = results[index];
-                final declaredRank = (res['rank'] as num?)?.toInt() ?? 0;
-                final displayPosition = declaredRank > 0 ? declaredRank : index + 1;
-                final isWinner = displayPosition == 1;
-                final prizeBreakdown = _prizeBreakdown(res);
+            // Stats calculation
+            int totalMatchKills = 0;
+            double totalPrizeDistributed = 0.0;
+            Map<String, dynamic>? mvpPlayer;
+            int maxKills = -1;
 
-                return Container(
-                  padding: const EdgeInsets.all(12),
+            for (var r in results) {
+              final kills = (r['kills'] as num?)?.toInt() ?? 0;
+              final prize = (r['prizeWon'] as num?)?.toDouble() ?? 0.0;
+              totalMatchKills += kills;
+              totalPrizeDistributed += prize;
+              if (kills > maxKills) {
+                maxKills = kills;
+                mvpPlayer = r;
+              }
+            }
+
+            final booyahWinner = results.firstWhere(
+              (r) => ((r['rank'] as num?)?.toInt() ?? 0) == 1,
+              orElse: () => results.first,
+            );
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 🏆 Match Stats Overview Banner
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                   decoration: BoxDecoration(
-                    color: isWinner ? AppColors.primary.withValues(alpha: 0.1) : AppColors.surface,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: isWinner ? AppColors.primary : const Color(0xFF30363D)),
+                    color: const Color(0xFF10141A),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
                   ),
                   child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
-                      CircleAvatar(
-                        radius: 16,
-                        backgroundColor: isWinner ? AppColors.primary : AppColors.surfaceLight,
-                        child: Text("#$displayPosition", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: isWinner ? Colors.black : Colors.white)),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(res['playerName'] ?? 'Unknown', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white)),
-                            Text("UID: ${res['ffUid'] ?? 'N/A'}", style: const TextStyle(fontSize: 10, color: AppColors.textMuted)),
-                          ],
-                        ),
-                      ),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Text("${res['kills']} Kills", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.white)),
-                          if (prizeBreakdown.isNotEmpty)
-                            Text(prizeBreakdown, style: const TextStyle(fontSize: 9, color: AppColors.textMuted)),
-                          Text("₹${res['prizeWon']}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.neonGreen)),
-                        ],
-                      ),
+                      _buildSummaryTile("TOTAL KILLS", "$totalMatchKills", Icons.local_fire_department, AppColors.neonRed),
+                      Container(width: 1, height: 26, color: Colors.white10),
+                      _buildSummaryTile("PRIZE PAID", "₹${totalPrizeDistributed.toStringAsFixed(0)}", Icons.payments, AppColors.neonGreen),
+                      if (mvpPlayer != null && maxKills > 0) ...[
+                        Container(width: 1, height: 26, color: Colors.white10),
+                        _buildSummaryTile("MATCH MVP", "${mvpPlayer['playerName'] ?? 'MVP'} ($maxKills K)", Icons.stars, AppColors.primary),
+                      ],
                     ],
                   ),
-                );
-              },
+                ),
+                const SizedBox(height: 14),
+
+                // 👑 BOOYAH CHAMPION SPOTLIGHT (Rank 1)
+                if (booyahWinner != null) ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF2E2300), Color(0xFF1A1400)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: AppColors.primary, width: 1.5),
+                      boxShadow: [
+                        BoxShadow(color: AppColors.primary.withValues(alpha: 0.25), blurRadius: 12, spreadRadius: 1),
+                      ],
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary,
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.emoji_events, size: 12, color: Colors.black),
+                                  SizedBox(width: 4),
+                                  Text("BOOYAH! CHAMPION", style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900, fontSize: 10, letterSpacing: 0.5)),
+                                ],
+                              ),
+                            ),
+                            Text(
+                              "₹${((booyahWinner['prizeWon'] as num?)?.toDouble() ?? 0).toStringAsFixed(0)} WON",
+                              style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 14),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            CircleAvatar(
+                              radius: 22,
+                              backgroundColor: AppColors.primary,
+                              child: const Text("👑", style: TextStyle(fontSize: 20)),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    booyahWinner['playerName'] ?? 'Champion',
+                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                                  ),
+                                  Text(
+                                    "UID: ${booyahWinner['ffUid'] ?? 'N/A'}",
+                                    style: const TextStyle(color: Colors.grey, fontSize: 11),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.5),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: AppColors.primary.withValues(alpha: 0.4)),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.gps_fixed, size: 12, color: AppColors.primary),
+                                  const SizedBox(width: 4),
+                                  Text("${booyahWinner['kills']} Kills", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                ],
+
+                // 📊 Full Survival Match Scoreboard List
+                ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: results.length,
+                  separatorBuilder: (context, index) => const SizedBox(height: 8),
+                  itemBuilder: (context, index) {
+                    final res = results[index];
+                    final declaredRank = (res['rank'] as num?)?.toInt() ?? 0;
+                    final rankNum = declaredRank > 0 ? declaredRank : index + 1;
+                    final isMyRow = currentUserId != null && res['userId'] == currentUserId;
+                    final prizeWon = (res['prizeWon'] as num?)?.toDouble() ?? 0.0;
+                    final kills = (res['kills'] as num?)?.toInt() ?? 0;
+                    final prizeBreakdownStr = _prizeBreakdown(res);
+
+                    Color rankColor;
+                    IconData? rankIcon;
+                    if (rankNum == 1) {
+                      rankColor = const Color(0xFFFFD700);
+                      rankIcon = Icons.military_tech;
+                    } else if (rankNum == 2) {
+                      rankColor = const Color(0xFFC0C0C0);
+                    } else if (rankNum == 3) {
+                      rankColor = const Color(0xFFCD7F32);
+                    } else {
+                      rankColor = Colors.white54;
+                    }
+
+                    return Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: isMyRow
+                            ? AppColors.primary.withValues(alpha: 0.12)
+                            : rankNum == 1
+                                ? AppColors.primary.withValues(alpha: 0.06)
+                                : AppColors.surface,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isMyRow
+                              ? AppColors.neonGreen
+                              : rankNum == 1
+                                  ? AppColors.primary.withValues(alpha: 0.6)
+                                  : const Color(0xFF30363D),
+                          width: isMyRow ? 1.5 : 1,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          // Rank Badge
+                          Container(
+                            width: 34,
+                            height: 34,
+                            decoration: BoxDecoration(
+                              color: rankColor.withValues(alpha: 0.15),
+                              shape: BoxShape.circle,
+                              border: Border.all(color: rankColor.withValues(alpha: 0.6)),
+                            ),
+                            child: Center(
+                              child: rankIcon != null
+                                  ? Icon(rankIcon, size: 18, color: rankColor)
+                                  : Text(
+                                      "#$rankNum",
+                                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: rankColor),
+                                    ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+
+                          // Player Details
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Flexible(
+                                      child: Text(
+                                        res['playerName'] ?? 'Unknown Gamer',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 13,
+                                          color: isMyRow ? AppColors.neonGreen : Colors.white,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    if (isMyRow) ...[
+                                      const SizedBox(width: 6),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.neonGreen,
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: const Text("YOU", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 9)),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  "UID: ${res['ffUid'] ?? 'N/A'}${prizeBreakdownStr.isNotEmpty && prizeBreakdownStr != '₹0' ? ' • $prizeBreakdownStr' : ''}",
+                                  style: const TextStyle(fontSize: 10, color: AppColors.textMuted),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          // Kills & Prize Column
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: Colors.white10,
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  "$kills Kills",
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Colors.white),
+                                ),
+                              ),
+                              if (prizeWon > 0) ...[
+                                const SizedBox(height: 4),
+                                Text(
+                                  "+₹${prizeWon.toStringAsFixed(0)}",
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.neonGreen),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ],
             );
           },
         ),
+      ],
+    );
+  }
+
+  Widget _buildSummaryTile(String label, String value, IconData icon, Color color) {
+    return Column(
+      children: [
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 12, color: color),
+            const SizedBox(width: 4),
+            Text(label, style: TextStyle(fontSize: 9, color: Colors.grey.shade400, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+          ],
+        ),
+        const SizedBox(height: 2),
+        Text(value, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: color)),
       ],
     );
   }

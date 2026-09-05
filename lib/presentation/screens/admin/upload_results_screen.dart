@@ -200,14 +200,56 @@ class _UploadResultsScreenState extends State<UploadResultsScreen> {
                                 ),
                                 const SizedBox(width: 10),
                                 Expanded(
-                                  child: Text(
-                                    "${res['playerName']} • Slot $slotNum",
-                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        "${res['playerName']} • Slot $slotNum",
+                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                      ),
+                                      Text("UID: ${res['ffUid']}", style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                                    ],
+                                  ),
+                                ),
+                                // Quick "🏆 SET BOOYAH" Button
+                                InkWell(
+                                  onTap: () {
+                                    _setRank(res, "1");
+                                    _controllerFor(res['userId'], 'rank').text = "1";
+                                  },
+                                  borderRadius: BorderRadius.circular(20),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                    decoration: BoxDecoration(
+                                      color: (res['rank'] == 1)
+                                          ? AppColors.primary
+                                          : AppColors.primary.withValues(alpha: 0.15),
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(color: AppColors.primary),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.emoji_events,
+                                          size: 14,
+                                          color: (res['rank'] == 1) ? Colors.black : AppColors.primary,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          (res['rank'] == 1) ? "BOOYAH! #1" : "SET BOOYAH",
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.bold,
+                                            color: (res['rank'] == 1) ? Colors.black : AppColors.primary,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
                               ],
                             ),
-                            Text("UID: ${res['ffUid']}", style: const TextStyle(color: Colors.grey, fontSize: 12)),
                             const Divider(color: Colors.white10),
                             
                             // Fields row
@@ -222,15 +264,50 @@ class _UploadResultsScreenState extends State<UploadResultsScreen> {
                                   ),
                                 ),
                                 const SizedBox(width: 10),
+                                // Kills with Quick Increment / Decrement
                                 Expanded(
-                                  child: _buildInputField(
-                                    "Kills",
-                                    TextInputType.number,
-                                    _controllerFor(res['userId'], 'kills'),
-                                    (val) => _setKills(res, val, perKillRate),
+                                  flex: 2,
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: _buildInputField(
+                                              "Kills",
+                                              TextInputType.number,
+                                              _controllerFor(res['userId'], 'kills'),
+                                              (val) => _setKills(res, val, perKillRate),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 4),
+                                          IconButton(
+                                            visualDensity: VisualDensity.compact,
+                                            icon: const Icon(Icons.remove_circle_outline, color: Colors.redAccent, size: 20),
+                                            onPressed: () {
+                                              final currentKills = (res['kills'] as int? ?? 0);
+                                              if (currentKills > 0) {
+                                                final newKills = currentKills - 1;
+                                                _controllerFor(res['userId'], 'kills').text = "$newKills";
+                                                _setKills(res, "$newKills", perKillRate);
+                                              }
+                                            },
+                                          ),
+                                          IconButton(
+                                            visualDensity: VisualDensity.compact,
+                                            icon: const Icon(Icons.add_circle_outline, color: AppColors.neonGreen, size: 20),
+                                            onPressed: () {
+                                              final currentKills = (res['kills'] as int? ?? 0);
+                                              final newKills = currentKills + 1;
+                                              _controllerFor(res['userId'], 'kills').text = "$newKills";
+                                              _setKills(res, "$newKills", perKillRate);
+                                            },
+                                          ),
+                                        ],
+                                      ),
+                                    ],
                                   ),
                                 ),
-                                // Show all prize fields for non-live to allow editing
                                 const SizedBox(width: 10),
                                 Expanded(
                                   child: _buildInputField(
@@ -317,13 +394,14 @@ class _UploadResultsScreenState extends State<UploadResultsScreen> {
     }
 
     _refreshTotal(result);
+    setState(() {});
   }
 
   void _setPrize(Map<String, dynamic> result, String key, String value) {
     result[key] = double.tryParse(value) ?? 0.0;
-    final total = (result['positionPrize'] as double) +
-        (result['killPrize'] as double) +
-        (result['booyahPrize'] as double);
+    final total = ((result['positionPrize'] as num?)?.toDouble() ?? 0.0) +
+        ((result['killPrize'] as num?)?.toDouble() ?? 0.0) +
+        ((result['booyahPrize'] as num?)?.toDouble() ?? 0.0);
     result['prizeWon'] = total;
     _totalNotifierFor(result['userId']).value = total;
   }
@@ -335,6 +413,7 @@ class _UploadResultsScreenState extends State<UploadResultsScreen> {
     result['killPrize'] = autoKillPrize;
     _controllerFor(result['userId'], 'killPrize').text = autoKillPrize > 0 ? autoKillPrize.toStringAsFixed(0) : '0';
     _refreshTotal(result);
+    setState(() {});
   }
 
   void _refreshTotal(Map<String, dynamic> result) {
