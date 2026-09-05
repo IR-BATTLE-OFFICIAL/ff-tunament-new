@@ -251,7 +251,11 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.confirmation_number),
                 ),
-                validator: (v) => double.tryParse(v!.trim()) == null ? "Enter valid amount" : null,
+                validator: (v) {
+                  final s = v?.trim() ?? '';
+                  if (s.isEmpty) return null; // 0 allowed
+                  return double.tryParse(s) == null ? "Enter valid amount" : null;
+                },
               ),
               const SizedBox(height: 15),
               TextFormField(
@@ -263,7 +267,11 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.emoji_events),
                 ),
-                validator: (v) => double.tryParse(v!.trim()) == null ? "Enter valid amount" : null,
+                validator: (v) {
+                  final s = v?.trim() ?? '';
+                  if (s.isEmpty) return null; // 0 allowed
+                  return double.tryParse(s) == null ? "Enter valid amount" : null;
+                },
               ),
               const SizedBox(height: 15),
               TextFormField(
@@ -285,7 +293,11 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.gps_fixed),
                 ),
-                validator: (v) => double.tryParse(v!.trim()) == null ? "Enter valid amount" : null,
+                validator: (v) {
+                  final s = v?.trim() ?? '';
+                  if (s.isEmpty) return null; // 0 allowed
+                  return double.tryParse(s) == null ? "Enter valid amount" : null;
+                },
               ),
               const SizedBox(height: 20),
               
