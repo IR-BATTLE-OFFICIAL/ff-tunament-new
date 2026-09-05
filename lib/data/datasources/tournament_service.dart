@@ -72,6 +72,7 @@ class TournamentService {
       'winnerName': null,
       'resultDeclared': false,
       'prizesDistributed': false,
+      'filledSlots': 0,
       'joinedCount': 0,
       'resultImageUrl': FieldValue.delete(),
     });
@@ -122,10 +123,28 @@ class TournamentService {
   }
 
   Future<void> joinTournament(RegistrationModel reg, double entryFee, {String? voucherId}) async {
-    await _db.collection('registrations').add(reg.toMap());
-    if (voucherId != null && voucherId.isNotEmpty) {
-      await markVoucherUsed(voucherId, reg.userId);
-    }
+    final tournamentRef = _db.collection('tournaments').doc(reg.tournamentId);
+    final registrationRef = _db.collection('registrations').doc();
+
+    return _db.runTransaction((transaction) async {
+      final tournamentDoc = await transaction.get(tournamentRef);
+      if (!tournamentDoc.exists) throw Exception("Tournament not found");
+
+      final int filledSlots = (tournamentDoc['filledSlots'] as num?)?.toInt() ?? 0;
+      final int totalSlots = (tournamentDoc['totalSlots'] as num?)?.toInt() ?? 0;
+
+      if (filledSlots >= totalSlots) throw Exception("Tournament is full");
+
+      transaction.set(registrationRef, reg.toMap());
+      transaction.update(tournamentRef, {
+        'filledSlots': FieldValue.increment(1),
+        'joinedCount': FieldValue.increment(1),
+      });
+    }).then((_) {
+      if (voucherId != null && voucherId.isNotEmpty) {
+        markVoucherUsed(voucherId, reg.userId);
+      }
+    });
   }
 
   Stream<List<RegistrationModel>> getParticipants(String tournamentId) {
@@ -652,9 +671,10 @@ class TournamentService {
 
   Future<void> uploadResultsAndComplete(String tournamentId, List<Map<String, dynamic>> results, {String? resultImageUrl}) async {
     final tournamentDoc = await _db.collection('tournaments').doc(tournamentId).get();
-    final String tournamentTitle = tournamentDoc.exists
-        ? (tournamentDoc.data()?['title']?.toString() ?? 'Tournament')
-        : 'Tournament';
+    if (!tournamentDoc.exists) throw Exception("Tournament not found");
+
+    final TournamentModel tournament = TournamentModel.fromFirestore(tournamentDoc);
+    final String tournamentTitle = tournament.title;
 
     final batch = _db.batch();
     final resultsCollection = _db.collection('results');
@@ -666,7 +686,24 @@ class TournamentService {
       }
     }
 
-    for (var result in results) {
+    // Sort results by rank to handle dynamic breakdown correctly
+    final sortedResults = List<Map<String, dynamic>>.from(results)
+      ..sort((a, b) => ((a['rank'] as num?)?.toInt() ?? 0).compareTo((b['rank'] as num?)?.toInt() ?? 0));
+
+    for (var result in sortedResults) {
+      // Apply automated prize breakdown if it's a Survival match
+      if (tournament.mode.toLowerCase() == 'survival' && tournament.prizeBreakdown.isNotEmpty) {
+        final rank = (result['rank'] as num?)?.toInt() ?? 0;
+        final matchingPrize = tournament.prizeBreakdown.firstWhere(
+          (p) => (p['rank'] as num?)?.toInt() == rank,
+          orElse: () => {'amount': 0.0},
+        );
+        
+        final double rankPrize = (matchingPrize['amount'] as num?)?.toDouble() ?? 0.0;
+        result['positionPrize'] = rankPrize;
+        result['prizeWon'] = rankPrize + (result['killPrize'] as num? ?? 0.0) + (result['booyahPrize'] as num? ?? 0.0);
+      }
+
       final docRef = resultsCollection.doc();
       batch.set(docRef, {
         'tournamentId': tournamentId,
@@ -685,7 +722,7 @@ class TournamentService {
     await batch.commit();
 
     // Automatically distribute coins to wallet and create transaction history for all participants
-    for (var result in results) {
+    for (var result in sortedResults) {
       final String? userId = result['userId']?.toString();
       if (userId == null || userId.isEmpty) continue;
 

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:ff_arena/core/theme/app_theme.dart';
 import 'package:ff_arena/data/models/tournament_model.dart';
+import 'package:ff_arena/data/models/registration_model.dart';
+import 'package:ff_arena/presentation/providers/tournament_provider.dart';
+import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:ff_arena/presentation/screens/tournament/tournament_details_screen.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
@@ -13,9 +16,20 @@ class TournamentCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final int slotsLeft = (tournament.totalSlots - tournament.filledSlots).clamp(0, tournament.totalSlots);
-    final double fillRatio = tournament.totalSlots > 0 ? (tournament.filledSlots / tournament.totalSlots).clamp(0.0, 1.0) : 0.0;
-    final bool isFull = slotsLeft == 0;
+    final tournamentProvider = Provider.of<TournamentProvider>(context, listen: false);
+
+    return StreamBuilder<List<RegistrationModel>>(
+      stream: tournamentProvider.participants(tournament.id),
+      builder: (context, snapshot) {
+        final int activeJoinedCount = snapshot.hasData ? snapshot.data!.length : 0;
+        final int effectiveFilled = activeJoinedCount > tournament.filledSlots
+            ? activeJoinedCount
+            : tournament.filledSlots;
+        final int slotsLeft = (tournament.totalSlots - effectiveFilled).clamp(0, tournament.totalSlots);
+        final double fillRatio = tournament.totalSlots > 0
+            ? (effectiveFilled / tournament.totalSlots).clamp(0.0, 1.0)
+            : 0.0;
+        final bool isFull = slotsLeft == 0;
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -275,7 +289,7 @@ class TournamentCard extends StatelessWidget {
                                     ),
                                   ),
                                   Text(
-                                    "${tournament.filledSlots}/${tournament.totalSlots}",
+                                    "$effectiveFilled/${tournament.totalSlots}",
                                     style: const TextStyle(fontSize: 10, color: AppColors.textMuted),
                                   ),
                                 ],
@@ -348,6 +362,8 @@ class TournamentCard extends StatelessWidget {
           ),
         ),
       ),
+    );
+      },
     );
   }
 

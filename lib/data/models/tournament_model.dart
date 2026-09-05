@@ -30,6 +30,7 @@ class TournamentModel {
   final String? platform; // youtube, rooter, locoe, etc.
   final String? resultImageUrl;
   final bool isAdminDeleted;
+  final List<Map<String, dynamic>> prizeBreakdown;
 
   TournamentModel({
     required this.id,
@@ -59,6 +60,7 @@ class TournamentModel {
     this.platform,
     this.resultImageUrl,
     this.isAdminDeleted = false,
+    this.prizeBreakdown = const [],
   });
 
   factory TournamentModel.fromFirestore(DocumentSnapshot doc) {
@@ -76,6 +78,15 @@ class TournamentModel {
       dt = DateTime.now();
     }
 
+    final List<Map<String, dynamic>> breakdown = [];
+    if (data['prizeBreakdown'] is List) {
+      for (var item in (data['prizeBreakdown'] as List)) {
+        if (item is Map<String, dynamic>) {
+          breakdown.add(item);
+        }
+      }
+    }
+
     return TournamentModel(
       id: doc.id,
       title: (data['title'] ?? '').toString(),
@@ -89,8 +100,8 @@ class TournamentModel {
       mode: (data['mode'] ?? 'BR Rank').toString(),
       gameModeId: data['gameModeId']?.toString(),
       map: (data['map'] ?? 'Bermuda').toString(),
-      totalSlots: (data['totalSlots'] as num?)?.toInt() ?? 0,
-      filledSlots: (data['filledSlots'] as num?)?.toInt() ?? 0,
+      totalSlots: (data['totalSlots'] as num?)?.toInt() ?? (data['maxPlayers'] as num?)?.toInt() ?? 0,
+      filledSlots: (data['filledSlots'] as num?)?.toInt() ?? (data['joinedCount'] as num?)?.toInt() ?? (data['joinedPlayers'] as num?)?.toInt() ?? 0,
       version: (data['version'] ?? 'Mobile').toString(),
       status: (data['status'] ?? 'upcoming').toString(),
       roomId: data['roomId']?.toString(),
@@ -104,6 +115,7 @@ class TournamentModel {
       platform: data['platform']?.toString(),
       resultImageUrl: data['resultImageUrl']?.toString(),
       isAdminDeleted: data['isAdminDeleted'] == true,
+      prizeBreakdown: breakdown,
     );
   }
 
@@ -135,6 +147,7 @@ class TournamentModel {
       'platform': platform,
       'resultImageUrl': resultImageUrl,
       'isAdminDeleted': isAdminDeleted,
+      'prizeBreakdown': prizeBreakdown,
     };
   }
 
@@ -166,6 +179,7 @@ class TournamentModel {
     String? platform,
     String? resultImageUrl,
     bool? isAdminDeleted,
+    List<Map<String, dynamic>>? prizeBreakdown,
   }) {
     return TournamentModel(
       id: id ?? this.id,
@@ -195,6 +209,7 @@ class TournamentModel {
       platform: platform ?? this.platform,
       resultImageUrl: resultImageUrl ?? this.resultImageUrl,
       isAdminDeleted: isAdminDeleted ?? this.isAdminDeleted,
+      prizeBreakdown: prizeBreakdown ?? this.prizeBreakdown,
     );
   }
 }
