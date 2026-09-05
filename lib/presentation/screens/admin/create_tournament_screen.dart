@@ -30,6 +30,7 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
   final _totalSlotsController = TextEditingController();
   final _rulesController = TextEditingController();
   final _liveStreamUrlController = TextEditingController();
+  final List<Map<String, TextEditingController>> _prizeBreakdownControllers = [];
 
   @override
   void dispose() {
@@ -42,6 +43,10 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
     _totalSlotsController.dispose();
     _rulesController.dispose();
     _liveStreamUrlController.dispose();
+    for (var controllerMap in _prizeBreakdownControllers) {
+      controllerMap['rank']?.dispose();
+      controllerMap['amount']?.dispose();
+    }
     super.dispose();
   }
 
@@ -73,6 +78,30 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
     _version = tournament.version;
     final savedPlatform = tournament.platform ?? 'YouTube';
     _platform = ['YouTube', 'Rooter', 'Loco', 'Other'].contains(savedPlatform) ? savedPlatform : 'Other';
+
+    for (var prize in tournament.prizeBreakdown) {
+      _prizeBreakdownControllers.add({
+        'rank': TextEditingController(text: prize['rank']?.toString()),
+        'amount': TextEditingController(text: prize['amount']?.toString()),
+      });
+    }
+  }
+
+  void _addPrizeRow() {
+    setState(() {
+      _prizeBreakdownControllers.add({
+        'rank': TextEditingController(),
+        'amount': TextEditingController(),
+      });
+    });
+  }
+
+  void _removePrizeRow(int index) {
+    setState(() {
+      _prizeBreakdownControllers[index]['rank']?.dispose();
+      _prizeBreakdownControllers[index]['amount']?.dispose();
+      _prizeBreakdownControllers.removeAt(index);
+    });
   }
 
   Future<void> _loadDefaultRules() async {
@@ -258,7 +287,47 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
                 ),
                 validator: (v) => double.tryParse(v!.trim()) == null ? "Enter valid amount" : null,
               ),
-              const SizedBox(height: 25),
+              const SizedBox(height: 20),
+              
+              if (_mode.trim().toLowerCase() == 'survival') ...[
+                _buildSectionTitle("Prize Breakdown"),
+                const SizedBox(height: 10),
+                ..._prizeBreakdownControllers.asMap().entries.map((entry) {
+                  int index = entry.key;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            controller: entry.value['rank'],
+                            decoration: const InputDecoration(labelText: "Rank", border: OutlineInputBorder()),
+                            keyboardType: TextInputType.number,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: TextFormField(
+                            controller: entry.value['amount'],
+                            decoration: const InputDecoration(labelText: "Prize Pool (₹)", border: OutlineInputBorder()),
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.delete, color: Colors.red),
+                          onPressed: () => _removePrizeRow(index),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+                TextButton.icon(
+                  onPressed: _addPrizeRow,
+                  icon: const Icon(Icons.add),
+                  label: const Text("Add Prize Rank"),
+                ),
+                const SizedBox(height: 25),
+              ],
               
               // Image Picker Section
               GestureDetector(
@@ -517,9 +586,19 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
       double booyahPool = double.tryParse(_booyahPoolController.text) ?? 0.0;
       double perKillPrize = double.tryParse(_perKillController.text) ?? 0.0;
 
-      if (!_isFree && prizePool == 0.0 && perKillPrize == 0.0 && booyahPool == 0.0) {
+      final List<Map<String, dynamic>> prizeBreakdown = _prizeBreakdownControllers
+          .map((c) => {
+                'rank': int.tryParse(c['rank']?.text ?? '0') ?? 0,
+                'amount': double.tryParse(c['amount']?.text ?? '0.0') ?? 0.0,
+              })
+          .toList();
+
+      // Validation logic: allow creation if it's free, or has prize pool/breakdown/kill/booyah prize
+      final bool hasPrize = prizePool > 0 || booyahPool > 0 || perKillPrize > 0 || prizeBreakdown.isNotEmpty;
+      
+      if (!_isFree && !hasPrize) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text("Please provide Prize Pool, Booyah Pool, or Per Kill Prize."),
+          content: Text("Please provide at least one prize (Pool, Booyah, Per Kill, or Breakdown) for paid tournaments."),
           backgroundColor: Colors.redAccent,
         ));
         return;
@@ -557,6 +636,7 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
           winnerId: widget.tournament?.winnerId,
           winnerName: widget.tournament?.winnerName,
           resultImageUrl: widget.tournament?.resultImageUrl,
+          prizeBreakdown: prizeBreakdown,
         );
 
         final provider = Provider.of<TournamentProvider>(context, listen: false);

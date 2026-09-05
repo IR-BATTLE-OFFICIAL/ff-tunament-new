@@ -1360,7 +1360,7 @@ class _TournamentDetailsScreenState extends State<TournamentDetailsScreen> {
           stream: provider.results(widget.tournament.id),
           builder: (context, resSnapshot) {
             if (resSnapshot.connectionState == ConnectionState.waiting) {
-              return const Center(padding: EdgeInsets.all(20), child: CircularProgressIndicator(color: AppColors.primary));
+              return const Padding(padding: EdgeInsets.all(20), child: Center(child: CircularProgressIndicator(color: AppColors.primary)));
             }
             if (!resSnapshot.hasData || resSnapshot.data!.isEmpty) {
               return Container(

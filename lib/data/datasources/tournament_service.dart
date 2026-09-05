@@ -933,6 +933,7 @@ class TournamentService {
         .map((snapshot) {
       final results = snapshot.docs
           .map((doc) => doc.data())
+          .where((data) => data['isCompletedHistory'] != true)
           .toList();
       results.sort((a, b) {
         final aRank = (a['rank'] as num?)?.toInt() ?? 0;
