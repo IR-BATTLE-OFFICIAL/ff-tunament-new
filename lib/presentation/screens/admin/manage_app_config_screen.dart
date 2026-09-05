@@ -577,6 +577,21 @@ class _ManageAppConfigScreenState extends State<ManageAppConfigScreen> {
 
                 const Divider(height: 60),
 
+                // ─── Wallet Time Window (Add Cash & Withdraw) ───────────────
+                const Text(
+                  "Wallet Service Hours",
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.tealAccent),
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  "Set daily open/close time for Add Cash & Withdraw. Leave both blank to keep always open.",
+                  style: TextStyle(color: Colors.grey, fontSize: 12),
+                ),
+                const SizedBox(height: 20),
+                _WalletTimeSection(config: config, onSave: (data) => _updateConfig(provider, data)),
+
+                const Divider(height: 60),
+
                 const Text("App Share & Referral Rewards", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blueAccent)),
                 const SizedBox(height: 10),
                 const Text("Set the download link and reward amounts for referrals.", style: TextStyle(color: Colors.grey, fontSize: 13)),
@@ -695,6 +710,239 @@ class _ManageAppConfigScreenState extends State<ManageAppConfigScreen> {
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+// ─── Wallet Time Section Widget ───────────────────────────────────────────────
+class _WalletTimeSection extends StatefulWidget {
+  final Map<String, dynamic> config;
+  final void Function(Map<String, dynamic>) onSave;
+
+  const _WalletTimeSection({required this.config, required this.onSave});
+
+  @override
+  State<_WalletTimeSection> createState() => _WalletTimeSectionState();
+}
+
+class _WalletTimeSectionState extends State<_WalletTimeSection> {
+  TimeOfDay? _openTime;
+  TimeOfDay? _closeTime;
+
+  TimeOfDay? _parseTime(String? raw) {
+    if (raw == null || raw.isEmpty) return null;
+    final parts = raw.split(':');
+    if (parts.length != 2) return null;
+    return TimeOfDay(hour: int.tryParse(parts[0]) ?? 0, minute: int.tryParse(parts[1]) ?? 0);
+  }
+
+  String _fmt(TimeOfDay t) =>
+      '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+
+  String _displayFmt(TimeOfDay t) {
+    final h = t.hourOfPeriod == 0 ? 12 : t.hourOfPeriod;
+    final suffix = t.period == DayPeriod.am ? 'AM' : 'PM';
+    return '$h:${t.minute.toString().padLeft(2, '0')} $suffix';
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _openTime = _parseTime(widget.config['walletOpenTime']);
+    _closeTime = _parseTime(widget.config['walletCloseTime']);
+  }
+
+  Future<void> _pickOpen() async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: _openTime ?? const TimeOfDay(hour: 10, minute: 0),
+      helpText: 'Select Wallet OPEN Time',
+    );
+    if (picked != null) setState(() => _openTime = picked);
+  }
+
+  Future<void> _pickClose() async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: _closeTime ?? const TimeOfDay(hour: 22, minute: 0),
+      helpText: 'Select Wallet CLOSE Time',
+    );
+    if (picked != null) setState(() => _closeTime = picked);
+  }
+
+  void _clearTimes() {
+    setState(() {
+      _openTime = null;
+      _closeTime = null;
+    });
+    widget.onSave({'walletOpenTime': '', 'walletCloseTime': ''});
+  }
+
+  void _save() {
+    if (_openTime == null || _closeTime == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Please set both Open and Close time, or tap Clear to keep always open."),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+    widget.onSave({
+      'walletOpenTime': _fmt(_openTime!),
+      'walletCloseTime': _fmt(_closeTime!),
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isAlwaysOpen = _openTime == null && _closeTime == null;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.teal.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.tealAccent.withOpacity(0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Status Badge
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: isAlwaysOpen ? Colors.green.withOpacity(0.2) : Colors.orange.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: isAlwaysOpen ? Colors.green : Colors.orange),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  isAlwaysOpen ? Icons.lock_open : Icons.access_time,
+                  size: 14,
+                  color: isAlwaysOpen ? Colors.green : Colors.orange,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  isAlwaysOpen
+                      ? 'Always Open (No Restriction)'
+                      : 'Restricted: ${_displayFmt(_openTime!)} – ${_displayFmt(_closeTime!)}',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: isAlwaysOpen ? Colors.green : Colors.orange,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+          // Time pickers row
+          Row(
+            children: [
+              Expanded(
+                child: GestureDetector(
+                  onTap: _pickOpen,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.white10,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.green.withOpacity(0.5)),
+                    ),
+                    child: Column(
+                      children: [
+                        const Icon(Icons.lock_open, color: Colors.green, size: 22),
+                        const SizedBox(height: 6),
+                        const Text("OPEN", style: TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 4),
+                        Text(
+                          _openTime != null ? _displayFmt(_openTime!) : 'Not Set',
+                          style: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.bold,
+                            color: _openTime != null ? Colors.green : Colors.grey,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        const Text("Tap to change", style: TextStyle(fontSize: 9, color: Colors.grey)),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                child: Column(
+                  children: const [
+                    Icon(Icons.arrow_forward, color: Colors.grey, size: 18),
+                    SizedBox(height: 4),
+                    Text("to", style: TextStyle(color: Colors.grey, fontSize: 11)),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: GestureDetector(
+                  onTap: _pickClose,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.white10,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.redAccent.withOpacity(0.5)),
+                    ),
+                    child: Column(
+                      children: [
+                        const Icon(Icons.lock, color: Colors.redAccent, size: 22),
+                        const SizedBox(height: 6),
+                        const Text("CLOSE", style: TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 4),
+                        Text(
+                          _closeTime != null ? _displayFmt(_closeTime!) : 'Not Set',
+                          style: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.bold,
+                            color: _closeTime != null ? Colors.redAccent : Colors.grey,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        const Text("Tap to change", style: TextStyle(fontSize: 9, color: Colors.grey)),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _clearTimes,
+                  icon: const Icon(Icons.clear, size: 16),
+                  label: const Text("Clear (Always Open)"),
+                  style: OutlinedButton.styleFrom(foregroundColor: Colors.grey),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: _save,
+                  icon: const Icon(Icons.save, size: 16),
+                  label: const Text("SAVE HOURS"),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.tealAccent,
+                    foregroundColor: Colors.black,
+                    textStyle: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
