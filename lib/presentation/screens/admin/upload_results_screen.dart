@@ -83,6 +83,9 @@ class _UploadResultsScreenState extends State<UploadResultsScreen> {
   Widget build(BuildContext context) {
     final tournamentProvider = Provider.of<TournamentProvider>(context);
     final perKillRate = widget.tournament.perKillPrize;
+    final hasPositionPrize = widget.tournament.prizePool > 0;
+    final hasKillPrize = widget.tournament.perKillPrize > 0;
+    final hasBooyahPrize = widget.tournament.booyahPool > 0;
     final isLive = widget.tournament.status == 'live';
 
     return Scaffold(
@@ -98,30 +101,24 @@ class _UploadResultsScreenState extends State<UploadResultsScreen> {
       ),
       body: Column(
         children: [
-          // Per-Kill rate info badge
-          if (perKillRate > 0)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.primary.withValues(alpha: 0.4)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.bolt, color: AppColors.primary, size: 18),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      "Tournament Per-Kill Rate: ₹${perKillRate.toStringAsFixed(0)} (Auto-Calculates Kill Prize)",
-                      style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 12),
-                    ),
-                  ),
-                ],
-              ),
+          // Prize summary info badges
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: [
+                if (hasPositionPrize)
+                  _infoBadge(Icons.emoji_events, "Prize Pool: ₹${widget.tournament.prizePool.toStringAsFixed(0)}", Colors.orangeAccent),
+                if (hasKillPrize)
+                  _infoBadge(Icons.bolt, "Per Kill: ₹${perKillRate.toStringAsFixed(0)}", AppColors.primary),
+                if (hasBooyahPrize)
+                  _infoBadge(Icons.military_tech, "Booyah Pool: ₹${widget.tournament.booyahPool.toStringAsFixed(0)}", Colors.purpleAccent),
+                if (!hasPositionPrize && !hasKillPrize && !hasBooyahPrize)
+                  _infoBadge(Icons.info_outline, "Free Tournament — Rank only mode", Colors.grey),
+              ],
             ),
+          ),
 
           Expanded(
             child: StreamBuilder<List<RegistrationModel>>(
@@ -170,10 +167,11 @@ class _UploadResultsScreenState extends State<UploadResultsScreen> {
                         userId: userId,
                         userName: res['playerName'] ?? 'Player',
                         ffUid: res['ffUid'] ?? '',
-                        userPhone: '',
-                        slotNumber: index + 1,
+                        teamName: '',
+                        playerDetails: [],
+                        registrationDate: DateTime.now(),
                         status: 'joined',
-                        joinedAt: DateTime.now(),
+                        slotNumber: index + 1,
                       ),
                     );
 
@@ -252,9 +250,10 @@ class _UploadResultsScreenState extends State<UploadResultsScreen> {
                             ),
                             const Divider(color: Colors.white10),
                             
-                            // Fields row
+                            // ── Row 1: Rank + Kills (always shown) ─────────
                             Row(
                               children: [
+                                // Rank
                                 Expanded(
                                   child: _buildInputField(
                                     "Rank",
@@ -264,83 +263,87 @@ class _UploadResultsScreenState extends State<UploadResultsScreen> {
                                   ),
                                 ),
                                 const SizedBox(width: 10),
-                                // Kills with Quick Increment / Decrement
+                                // Kills + ± buttons (always shown)
                                 Expanded(
                                   flex: 2,
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                  child: Row(
                                     children: [
-                                      Row(
-                                        children: [
-                                          Expanded(
-                                            child: _buildInputField(
-                                              "Kills",
-                                              TextInputType.number,
-                                              _controllerFor(res['userId'], 'kills'),
-                                              (val) => _setKills(res, val, perKillRate),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 4),
-                                          IconButton(
-                                            visualDensity: VisualDensity.compact,
-                                            icon: const Icon(Icons.remove_circle_outline, color: Colors.redAccent, size: 20),
-                                            onPressed: () {
-                                              final currentKills = (res['kills'] as int? ?? 0);
-                                              if (currentKills > 0) {
-                                                final newKills = currentKills - 1;
-                                                _controllerFor(res['userId'], 'kills').text = "$newKills";
-                                                _setKills(res, "$newKills", perKillRate);
-                                              }
-                                            },
-                                          ),
-                                          IconButton(
-                                            visualDensity: VisualDensity.compact,
-                                            icon: const Icon(Icons.add_circle_outline, color: AppColors.neonGreen, size: 20),
-                                            onPressed: () {
-                                              final currentKills = (res['kills'] as int? ?? 0);
-                                              final newKills = currentKills + 1;
-                                              _controllerFor(res['userId'], 'kills').text = "$newKills";
-                                              _setKills(res, "$newKills", perKillRate);
-                                            },
-                                          ),
-                                        ],
+                                      Expanded(
+                                        child: _buildInputField(
+                                          "Kills",
+                                          TextInputType.number,
+                                          _controllerFor(res['userId'], 'kills'),
+                                          (val) => _setKills(res, val, perKillRate),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      IconButton(
+                                        visualDensity: VisualDensity.compact,
+                                        icon: const Icon(Icons.remove_circle_outline, color: Colors.redAccent, size: 20),
+                                        onPressed: () {
+                                          final cur = (res['kills'] as int? ?? 0);
+                                          if (cur > 0) {
+                                            final n = cur - 1;
+                                            _controllerFor(res['userId'], 'kills').text = "$n";
+                                            _setKills(res, "$n", perKillRate);
+                                          }
+                                        },
+                                      ),
+                                      IconButton(
+                                        visualDensity: VisualDensity.compact,
+                                        icon: const Icon(Icons.add_circle_outline, color: AppColors.neonGreen, size: 20),
+                                        onPressed: () {
+                                          final n = (res['kills'] as int? ?? 0) + 1;
+                                          _controllerFor(res['userId'], 'kills').text = "$n";
+                                          _setKills(res, "$n", perKillRate);
+                                        },
                                       ),
                                     ],
                                   ),
                                 ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: _buildInputField(
-                                    "Position Prize (₹)",
-                                    TextInputType.number,
-                                    _controllerFor(res['userId'], 'positionPrize'),
-                                    (val) => _setPrize(res, 'positionPrize', val),
+                                // Position Prize — only if prizePool > 0
+                                if (hasPositionPrize) ...[
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: _buildInputField(
+                                      "Pos. Prize (₹)",
+                                      TextInputType.number,
+                                      _controllerFor(res['userId'], 'positionPrize'),
+                                      (val) => _setPrize(res, 'positionPrize', val),
+                                    ),
                                   ),
-                                ),
+                                ],
                               ],
                             ),
-                            const SizedBox(height: 10),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: _buildInputField(
-                                    "Kill Prize (₹)",
-                                    TextInputType.number,
-                                    _controllerFor(res['userId'], 'killPrize'),
-                                    (val) => _setPrize(res, 'killPrize', val),
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: _buildInputField(
-                                    "Booyah Prize (₹)",
-                                    TextInputType.number,
-                                    _controllerFor(res['userId'], 'booyahPrize'),
-                                    (val) => _setPrize(res, 'booyahPrize', val),
-                                  ),
-                                ),
-                              ],
-                            ),
+
+                            // ── Row 2: Kill Prize + Booyah Prize ───────────
+                            if (hasKillPrize || hasBooyahPrize) ...[
+                              const SizedBox(height: 10),
+                              Row(
+                                children: [
+                                  if (hasKillPrize)
+                                    Expanded(
+                                      child: _buildInputField(
+                                        "Kill Prize (₹)",
+                                        TextInputType.number,
+                                        _controllerFor(res['userId'], 'killPrize'),
+                                        (val) => _setPrize(res, 'killPrize', val),
+                                      ),
+                                    ),
+                                  if (hasKillPrize && hasBooyahPrize)
+                                    const SizedBox(width: 10),
+                                  if (hasBooyahPrize)
+                                    Expanded(
+                                      child: _buildInputField(
+                                        "Booyah Prize (₹)",
+                                        TextInputType.number,
+                                        _controllerFor(res['userId'], 'booyahPrize'),
+                                        (val) => _setPrize(res, 'booyahPrize', val),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ],
                             const SizedBox(height: 10),
                             ValueListenableBuilder<double>(
                               valueListenable: _totalNotifierFor(res['userId']),
@@ -358,6 +361,25 @@ class _UploadResultsScreenState extends State<UploadResultsScreen> {
               },
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _infoBadge(IconData icon, String text, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: color, size: 14),
+          const SizedBox(width: 5),
+          Text(text, style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.bold)),
         ],
       ),
     );
