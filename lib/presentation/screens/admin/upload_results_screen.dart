@@ -31,6 +31,44 @@ class _UploadResultsScreenState extends State<UploadResultsScreen> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    _loadResults();
+  }
+
+  Future<void> _loadResults() async {
+    final provider = Provider.of<TournamentProvider>(context, listen: false);
+    final results = await provider.results(widget.tournament.id).first;
+    
+    // If results already exist, populate fields for editing
+    if (results.isNotEmpty) {
+      final participants = await provider.participants(widget.tournament.id).first;
+      for (var p in participants) {
+        final existingRes = results.firstWhere((r) => r['userId'] == p.userId, orElse: () => {});
+        final res = {
+          'userId': p.userId,
+          'playerName': p.userName,
+          'ffUid': p.ffUid,
+          'rank': (existingRes['rank'] as num?)?.toInt() ?? 0,
+          'kills': (existingRes['kills'] as num?)?.toInt() ?? 0,
+          'positionPrize': (existingRes['positionPrize'] as num?)?.toDouble() ?? 0.0,
+          'killPrize': (existingRes['killPrize'] as num?)?.toDouble() ?? 0.0,
+          'booyahPrize': (existingRes['booyahPrize'] as num?)?.toDouble() ?? 0.0,
+          'prizeWon': (existingRes['prizeWon'] as num?)?.toDouble() ?? 0.0,
+        };
+        _results.add(res);
+        _controllerFor(res['userId'] as String, 'rank').text = res['rank'].toString();
+        _controllerFor(res['userId'] as String, 'kills').text = res['kills'].toString();
+        _controllerFor(res['userId'] as String, 'positionPrize').text = res['positionPrize'].toString();
+        _controllerFor(res['userId'] as String, 'killPrize').text = res['killPrize'].toString();
+        _controllerFor(res['userId'] as String, 'booyahPrize').text = res['booyahPrize'].toString();
+        _totalNotifierFor(res['userId'] as String).value = (res['prizeWon'] as num).toDouble();
+      }
+      setState(() {});
+    }
+  }
+
+  @override
   void dispose() {
     for (final controller in _fieldControllers.values) {
       controller.dispose();
@@ -60,7 +98,7 @@ class _UploadResultsScreenState extends State<UploadResultsScreen> {
       ),
       body: Column(
         children: [
-          // Per-Kill rate info badge at top (auto-derived from tournament setup)
+          // Per-Kill rate info badge
           if (perKillRate > 0)
             Container(
               width: double.infinity,
@@ -92,11 +130,8 @@ class _UploadResultsScreenState extends State<UploadResultsScreen> {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
                 }
-                if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                  return const Center(child: Text("No participants found"));
-                }
-
-                final participants = snapshot.data!;
+                
+                final participants = snapshot.data ?? [];
                 
                 // Initialize results list if empty
                 if (_results.isEmpty) {
@@ -115,11 +150,36 @@ class _UploadResultsScreenState extends State<UploadResultsScreen> {
                   }
                 }
 
+                if (_results.isEmpty) {
+                  return const Center(
+                    child: Text("No participants found to upload results.", style: TextStyle(color: Colors.grey)),
+                  );
+                }
+
                 return ListView.builder(
                   padding: const EdgeInsets.all(16),
                   itemCount: _results.length,
                   itemBuilder: (context, index) {
                     final res = _results[index];
+                    final userId = res['userId'] as String? ?? '';
+                    final participant = participants.firstWhere(
+                      (p) => p.userId == userId,
+                      orElse: () => RegistrationModel(
+                        id: '',
+                        tournamentId: widget.tournament.id,
+                        userId: userId,
+                        userName: res['playerName'] ?? 'Player',
+                        ffUid: res['ffUid'] ?? '',
+                        userPhone: '',
+                        slotNumber: index + 1,
+                        status: 'joined',
+                        joinedAt: DateTime.now(),
+                      ),
+                    );
+
+                    final profilePic = participant.userProfilePic;
+                    final slotNum = participant.slotNumber;
+
                     return Card(
                       color: AppColors.surface,
                       margin: const EdgeInsets.only(bottom: 16),
@@ -131,17 +191,17 @@ class _UploadResultsScreenState extends State<UploadResultsScreen> {
                             Row(
                               children: [
                                 CircleAvatar(
-                                  backgroundImage: participants[index].userProfilePic != null && participants[index].userProfilePic!.isNotEmpty
-                                      ? NetworkImage(participants[index].userProfilePic!)
+                                  backgroundImage: (profilePic != null && profilePic.isNotEmpty)
+                                      ? NetworkImage(profilePic)
                                       : null,
-                                  child: participants[index].userProfilePic == null || participants[index].userProfilePic!.isEmpty
+                                  child: (profilePic == null || profilePic.isEmpty)
                                       ? const Icon(Icons.person)
                                       : null,
                                 ),
                                 const SizedBox(width: 10),
                                 Expanded(
                                   child: Text(
-                                    "${res['playerName']} • Slot ${participants[index].slotNumber}",
+                                    "${res['playerName']} • Slot $slotNum",
                                     style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                                   ),
                                 ),
@@ -170,37 +230,48 @@ class _UploadResultsScreenState extends State<UploadResultsScreen> {
                                     (val) => _setKills(res, val, perKillRate),
                                   ),
                                 ),
-                                if (!isLive) ...[
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: _buildInputField(
-                                      "Booyah Prize (₹)",
-                                      TextInputType.number,
-                                      _controllerFor(res['userId'], 'booyahPrize'),
-                                      (val) => _setPrize(res, 'booyahPrize', val),
-                                    ),
+                                // Show all prize fields for non-live to allow editing
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: _buildInputField(
+                                    "Position Prize (₹)",
+                                    TextInputType.number,
+                                    _controllerFor(res['userId'], 'positionPrize'),
+                                    (val) => _setPrize(res, 'positionPrize', val),
                                   ),
-                                ],
+                                ),
                               ],
                             ),
-
-                            if (!isLive) ...[
-                              const SizedBox(height: 10),
-                              _buildInputField(
-                                "Kill Prize (₹) [Auto: ₹${perKillRate.toStringAsFixed(0)} × Kills]",
-                                TextInputType.number,
-                                _controllerFor(res['userId'], 'killPrize'),
-                                (val) => _setPrize(res, 'killPrize', val),
-                              ),
-                              const SizedBox(height: 10),
-                              ValueListenableBuilder<double>(
-                                valueListenable: _totalNotifierFor(res['userId']),
-                                builder: (context, total, _) => Text(
-                                  "Total coins: ₹${total.toStringAsFixed(0)}",
-                                  style: const TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold, fontSize: 14),
+                            const SizedBox(height: 10),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _buildInputField(
+                                    "Kill Prize (₹)",
+                                    TextInputType.number,
+                                    _controllerFor(res['userId'], 'killPrize'),
+                                    (val) => _setPrize(res, 'killPrize', val),
+                                  ),
                                 ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: _buildInputField(
+                                    "Booyah Prize (₹)",
+                                    TextInputType.number,
+                                    _controllerFor(res['userId'], 'booyahPrize'),
+                                    (val) => _setPrize(res, 'booyahPrize', val),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            ValueListenableBuilder<double>(
+                              valueListenable: _totalNotifierFor(res['userId']),
+                              builder: (context, total, _) => Text(
+                                "Total coins: ₹${total.toStringAsFixed(0)}",
+                                style: const TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold, fontSize: 14),
                               ),
-                            ],
+                            ),
                           ],
                         ),
                       ),

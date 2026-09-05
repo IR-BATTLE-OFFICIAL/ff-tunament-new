@@ -17,57 +17,62 @@ class ReferralAnalyticsScreen extends StatelessWidget {
       body: StreamBuilder<List<UserModel>>(
         stream: authProvider.allUsers,
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+          if (snapshot.hasError) {
+            return Center(child: Text("Error loading data: ${snapshot.error}", style: const TextStyle(color: Colors.redAccent)));
           }
           if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(child: Text("No users found"));
+            return const Center(child: Text("No users found", style: TextStyle(color: Colors.grey)));
           }
 
           final allUsers = snapshot.data!;
           
           // Map to store referral counts and earnings
-          // Key: Referral Code, Value: { count: int, users: List<UserModel> }
+          // Key: Referral Code / User ID, Value: { count: int, users: List<UserModel> }
           Map<String, Map<String, dynamic>> referrerStats = {};
 
-          // First, identify all referrers (users who have a referral code)
+          // First, identify all referrers (users who have a referral code or UID)
           for (var user in allUsers) {
-            if (user.referralCode != null && user.referralCode!.isNotEmpty) {
-              referrerStats[user.referralCode!] = {
-                'referrer': user,
-                'count': 0,
-                'referees': [],
-              };
-            }
+            final codeKey = (user.referralCode != null && user.referralCode!.isNotEmpty) 
+                ? user.referralCode! 
+                : user.uid;
+
+            referrerStats[codeKey] = {
+              'referrer': user,
+              'count': 0,
+              'referees': <UserModel>[],
+            };
           }
 
-          // Then, count how many users were referred by each code
+          // Then, count how many users were referred by each code or UID
           for (var user in allUsers) {
-            if (user.referredBy != null && user.referredBy!.isNotEmpty) {
-              // Note: referredBy is often the UID of the referrer in some systems, 
-              // but here let's check if it matches a referral code.
-              // Looking at registration logic, referredBy stores the UID of the referrer.
-              final referrerUid = user.referredBy!;
+            if (user.referredBy != null && user.referredBy!.trim().isNotEmpty) {
+              final refKey = user.referredBy!.trim();
               
-              // Find the referrer by UID
-              final referrer = allUsers.firstWhere((u) => u.uid == referrerUid, orElse: () => UserModel(uid: 'unknown'));
+              // Find the referrer by UID or Referral Code
+              final referrer = allUsers.firstWhere(
+                (u) => u.uid == refKey || (u.referralCode != null && u.referralCode == refKey), 
+                orElse: () => UserModel(uid: 'unknown')
+              );
               
-              if (referrer.uid != 'unknown' && referrer.referralCode != null) {
-                final code = referrer.referralCode!;
-                if (referrerStats.containsKey(code)) {
-                  referrerStats[code]!['count'] += 1;
-                  referrerStats[code]!['referees'].add(user);
+              if (referrer.uid != 'unknown') {
+                final codeKey = (referrer.referralCode != null && referrer.referralCode!.isNotEmpty) 
+                    ? referrer.referralCode! 
+                    : referrer.uid;
+
+                if (referrerStats.containsKey(codeKey)) {
+                  referrerStats[codeKey]!['count'] = (referrerStats[codeKey]!['count'] as int) + 1;
+                  (referrerStats[codeKey]!['referees'] as List<UserModel>).add(user);
                 }
               }
             }
           }
 
           // Convert map to list and sort by count descending
-          final sortedStats = referrerStats.values.where((stat) => stat['count'] > 0).toList();
+          final sortedStats = referrerStats.values.where((stat) => (stat['count'] as int) > 0).toList();
           sortedStats.sort((a, b) => (b['count'] as int).compareTo(a['count'] as int));
 
           if (sortedStats.isEmpty) {
-            return const Center(child: Text("No referrals found yet"));
+            return const Center(child: Text("No referrals found yet", style: TextStyle(color: Colors.grey)));
           }
 
           return ListView.builder(
